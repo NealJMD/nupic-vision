@@ -1,0 +1,54 @@
+{
+	"regions": [
+		{
+			"name": "input",
+			"type": "py.ImageSensor",
+			"params": {
+				"height": 200,
+				"width": 200
+			}
+		},
+		{
+			"name": "sp1",
+			"type": "py.SPRegion",
+			"params": {
+				"columnCount": 72,
+				"inputWidth": 200
+			}
+		},
+		{
+			"name": "sp2",
+			"type": "py.SPRegion",
+			"params": {
+				"columnCount": 72,
+				"inputWidth": 200
+			}
+		}
+	],
+	"links": [
+		{
+			"src": "input",
+			"dest": "sp1",
+			"type": "UniformLink",
+			"terminals": [
+				{
+					"srcOutput": "",
+					"destInput": ""
+				}
+			],
+			"params": {}
+		},
+		{
+			"src": "sp1",
+			"dest": "sp2",
+			"type": "UniformLink",
+			"terminals": [
+				{
+					"srcOutput": "",
+					"destInput": ""
+				}
+			],
+			"params": {}
+		}
+	]
+}

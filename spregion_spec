@@ -1,0 +1,438 @@
+{
+    "singleNodeOnly": true, 
+    "outputs": {
+        "topDownOut": {
+            "count": 0, 
+            "dataType": "Real32", 
+            "isDefaultOutput": false, 
+            "regionLevel": true, 
+            "description": "The top-down output signal, generated from\n                        feedback from upper levels"
+        }, 
+        "spatialTopDownOut": {
+            "count": 0, 
+            "dataType": "Real32", 
+            "isDefaultOutput": false, 
+            "regionLevel": true, 
+            "description": "The top-down output, generated only from the current\n                         SP output. This can be used to evaluate how well the\n                         SP is representing the inputs independent of the TP."
+        }, 
+        "temporalTopDownOut": {
+            "count": 0, 
+            "dataType": "Real32", 
+            "isDefaultOutput": false, 
+            "regionLevel": true, 
+            "description": "The top-down output, generated only from the current\n                         TP output feedback down through the SP."
+        }, 
+        "bottomUpOut": {
+            "count": 0, 
+            "dataType": "Real32", 
+            "isDefaultOutput": true, 
+            "regionLevel": true, 
+            "description": "The output signal generated from the bottom-up inputs\n                          from lower levels."
+        }, 
+        "anomalyScore": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "isDefaultOutput": false, 
+            "regionLevel": true, 
+            "description": "The score for how 'anomalous' (i.e. rare) this spatial\n                        input pattern is. Higher values are increasingly rare"
+        }
+    }, 
+    "description": "\n  SPRegion is designed to implement the spatial pooler compute for a given\n  HTM level.\n\n  Uses the FDRCSpatial2 class to do most of the work. This node has just one\n  FDRCSpatial instance for the enitire level and does *not* support the concept\n  of \"baby nodes\" within it.\n\n  Automatic parameter handling:\n\n  Parameter names, default values, and descriptions are retrieved automatically\n  from FDRCSpatial2. Thus, there are only a few hardcoded arguments in __init__,\n  and the rest are passed to the appropriate underlying class. The NodeSpec is\n  mostly built automatically from these parameters, too.\n\n  If you add a parameter to FDRCSpatial2, it will be exposed through SPRegion\n  automatically as if it were in SPRegion.__init__, with the right default\n  value. Add an entry in the __init__ docstring for it too, and that will be\n  brought into the NodeSpec. SPRegion will maintain the parameter as its own\n  instance variable and also pass it to FDRCSpatial2. If the parameter is\n  changed, SPRegion will propagate the change.\n\n  If you want to do something different with the parameter, add it as an\n  argument into SPRegion.__init__, which will override all the default handling.\n  ", 
+    "parameters": {
+        "stimulusThreshold": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "This is a number specifying the minimum number of synapses that must be on in order for a columns to turn ON. The purpose of this is to prevent noise input from activating columns.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "printPeriodicStats": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "If > 0, then every 'printPeriodicStats' iterations, the SP will print to stdout some statistics related to learning, such as the average pct under and over-coverage, average number of active columns, etc. in the last 'showLearningStats' iterations.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "learningMode": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "1 if the node is learning (default 1).", 
+            "accessMode": "ReadWrite"
+        }, 
+        "spatialImp": {
+            "count": 0, 
+            "dataType": "Byte", 
+            "constraints": "enum: py, cpp, oldpy", 
+            "description": "Which spatial pooler implementation to use. Set to either\n                      'py', or 'cpp'. The 'cpp' implementation is optimized for \n                      speed in C++.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "breakPdb": {
+            "count": 1, 
+            "description": "Set to 1 to stop in the pdb debugger on the next compute", 
+            "dataType": "UInt32", 
+            "accessMode": "ReadWrite", 
+            "defaultValue": 0, 
+            "constraints": "bool"
+        }, 
+        "numActivePerInhArea": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "An alternate way to control the density of the active columns. If numActivePerInhArea is specified then localAreaDensity must be -1, and vice versa. When using numActivePerInhArea, the inhibition logic will insure that at most 'numActivePerInhArea' columns remain ON within a local inhibition area (the size of which is set by the internally calculated inhibitionRadius, which is in turn determined from the average size of the connected receptive fields of all columns). When using this method, as columns learn and grow their effective receptive fields, the inhibitionRadius will grow, and hence the net density of the active columns will *decrease*. This is in contrast to the localAreaDensity method, which keeps the density of active columns the same regardless of the size of their receptive fields.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "minPctDutyCycleAfterInh": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "A number between 0 and 1.0, used to set a floor on how often a column should turn ON after inhibition. Periodically, each column looks at the duty cycle after inhibition of all other columns within its inhibition radius and sets its own internal minimal acceptable duty cycle to: minPctDutyCycleAfterInh * max(other columns' duty cycles). On each iteration, any column whose duty cycle after inhibition falls below this computed value will get its internal boost factor increased.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "testMode": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "If True, run the SP in test mode. This runs both the C++ and python implementations on all internal functions that support both and insures that both produce the same result.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "minPctDutyCycleBeforeInh": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "A number between 0 and 1.0, used to set a floor on how often a column should have at least stimulusThreshold active inputs. Periodically, each column looks at the duty cycle before inhibition of all other column within its inhibition radius and sets its own internal minimal acceptable duty cycle to: minPctDutyCycleBeforeInh * max(other columns' duty cycles). On each iteration, any column whose duty cycle before inhibition falls below this computed value will  get all of its permanence values boosted up by synPermActiveInc. Raising all permanences in response to a sub-par duty cycle before  inhibition allows a cell to search for new inputs when either its previously learned inputs are no longer ever active, or when the vast majority of them have been \"hijacked\" by other columns due to the no-dupe rule.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "spReconstructionParam": {
+            "count": 0, 
+            "dataType": "Byte", 
+            "constraints": "multiple", 
+            "description": "", 
+            "accessMode": "ReadWrite"
+        }, 
+        "commonDistributions": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "If set to True (the default, faster startup time), each column will be given the same initial permanence values. This is normally OK when you will be training, but if you will be sticking with the untrained network, you will want to set this to False (which makes startup take longer).", 
+            "accessMode": "ReadWrite"
+        }, 
+        "logPathOutputDense": {
+            "count": 0, 
+            "dataType": "Byte", 
+            "constraints": "", 
+            "description": "Optional name of output log file. If set, every output vector will be logged to this file as a dense vector.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "inputBorder": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "The first column from an edge will be centered over an input which is 'inputBorder' inputs from the edge.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "maxSSFiringBoost": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "Once a column turns ON, it's boost will immediately fall down to maxSSFiringBoost if it is above it. This is accomplished by internally raising it's computed duty cycle accordingly. This prevents a cell which has had it's boost raised extremely high from turning ON for too many diverse inputs in a row within a short period of time.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "spVerbosity": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "spVerbosity level: 0, 1, 2, or 3", 
+            "accessMode": "ReadWrite"
+        }, 
+        "maxSynPermBoost": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "The maximum synPermActiveInc boost factor. Each column's synPermActiveInc gets multiplied by a boost factor to make the column more or less likely to form new connections. The actual boost factor used is a number between 1.0 and maxSynPermBoost. A boost factor of 1.0 is used if the duty cycle is >= minDutyCycle, maxSynPermBoost is used if the duty cycle is 0, and any duty cycle in between is linearly extrapolated from these 2 endpoints.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "dutyCyclePeriod": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "The period used to calculate duty cycles. Higher values make it take longer to respond to changes in boost or synPerConnectedCell. Shorter values make it more unstable and likely to oscillate.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "sparseCoincidenceMatrix": {
+            "count": 0, 
+            "dataType": "Byte", 
+            "constraints": "", 
+            "description": "The coincidences, as a SparseMatrix", 
+            "accessMode": "Read"
+        }, 
+        "anomalyMode": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "1 if an anomaly score is being computed", 
+            "accessMode": "ReadWrite"
+        }, 
+        "numCloneMasters": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "The number of distinct clones in the map.  This is just outputCloningWidth*outputCloningHeight.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "coincInputPoolPct": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "What percent of the columns's receptive field is available for potential synapses. At initialization time, we will choose coincInputPoolPct * (2*coincInputRadius + 1)^2 potential synapses from the receptive field.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "spOverlapDistribution": {
+            "count": 0, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "The overlaps between the active output coincidences\n      and the input. The overlap amounts for each coincidence are sorted\n      from highest to lowest. ", 
+            "accessMode": "Read"
+        }, 
+        "columnCount": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "Total number of columns (coincidences).", 
+            "accessMode": "Read"
+        }, 
+        "randomSP": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "If True, the SP will not update its permanences and will instead use it's initial configuration for all inferences.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "spLearningStatsStr": {
+            "count": 0, 
+            "dataType": "Byte", 
+            "constraints": "handle", 
+            "description": "String representation of dictionary containing a number\n                     of statistics related to learning.", 
+            "accessMode": "Read"
+        }, 
+        "topDownMode": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "1 if the node should do top down compute on the next call to compute into topDownOut (default 0).", 
+            "accessMode": "ReadWrite"
+        }, 
+        "synPermOrphanDec": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "How much to decrease the permanence of an active synapse on a column which has high overlap with the input, but was inhibited (an \"orphan\" column).", 
+            "accessMode": "ReadWrite"
+        }, 
+        "activeOutputCount": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "Number of active elements in bottomUpOut output.", 
+            "accessMode": "Read"
+        }, 
+        "synPermConnected": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "The default connected threshold. Any synapse whose permanence value is above the connected threshold is a \"connected synapse\", meaning it can contribute to the cell's firing. Typical value is 0.10. Cells whose activity level before inhibition falls below minDutyCycleBeforeInh will have their own internal synPermConnectedCell threshold set below this default value. (This concept applies to both SP and TP and so 'cells' is correct here as opposed to 'columns')", 
+            "accessMode": "ReadWrite"
+        }, 
+        "breakKomodo": {
+            "count": 1, 
+            "description": "Set to 1 to stop in the Komodo debugger on the next compute", 
+            "dataType": "UInt32", 
+            "accessMode": "ReadWrite", 
+            "defaultValue": 0, 
+            "constraints": "bool"
+        }, 
+        "useHighTier": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "The \"high tier\" feature is to deal with sparse input spaces. If over (1-minDistance) percent of a column's connected synapses are active, it will automatically become one of the winning columns.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "minDistance": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "This parameter impacts how finely the input space is quantized. It is a value between 0 and 1.0. If set to 0, then every unique input presentation will generate a unique output representation, within the limits of the total number of columns available. Higher values will tend to group similar inputs together into the same output representation. Only column which overlap with the input less than 100*(1.0-minDistance) percent will have a possibility of losing the inhibition competition against a boosted, 'bored' cell.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "inputShape": {
+            "count": 2, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "The dimensions of the input vector. Format is (height, width) e.g. (24, 72). If the input is from a sensor, it is interpreted as having a 2-D topology of 24 pixels high and 72 wide.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "coincidencesShape": {
+            "count": 2, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "The dimensions of column layout. Format is (height, width) e.g. (80,100) means a total of 80*100 = 800 are arranged in a 2-D topology with 80 rows and 100 columns.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "globalInhibition": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "If true, enforce the localAreaDensity/numActivePerInhArea globally over the entire region, ignoring any dynamically calculated inhibitionRadius. In effect, this is the same as setting the inhibition radius to include the entire region.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "spInputNonZeros": {
+            "count": 0, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "The indices of the non-zero inputs to the spatial pooler", 
+            "accessMode": "Read"
+        }, 
+        "logPathInput": {
+            "count": 0, 
+            "dataType": "Byte", 
+            "constraints": "", 
+            "description": "Optional name of input log file. If set, every input vector will be logged to this file.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "inputDensity": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "The density of the input. This is only to aid in figuring out the initial number of connected synapses to place on each column. The lower the inputDensity, the more initial connections will be assigned to each column.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "coincInputRadius": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "This defines the max radius of the receptive field of each column. This is used to limit memory requirements and processing time. It could be set large enough to encompass the entire input field and the SP would still work fine, but require more memory and processing time. This parameter defines a square area: a column will have a max square RF with sides of length 2 * coincInputRadius + 1.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "logPathOutput": {
+            "count": 0, 
+            "dataType": "Byte", 
+            "constraints": "", 
+            "description": "Optional name of output log file. If set, every output vector will be logged to this file.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "localAreaDensity": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "The desired density of active columns within a local inhibition area (the size of which is set by the internally calculated inhibitionRadius, which is in turn determined from the average size of the connected receptive fields of all columns). The inhibition logic will insure that at most N columns remain ON within a local inhibition area, where N = localAreaDensity * (total number of columns in inhibition area).", 
+            "accessMode": "ReadWrite"
+        }, 
+        "denseOutput": {
+            "count": 0, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "Score for each coincidence.", 
+            "accessMode": "Read"
+        }, 
+        "inputWidth": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "Size of inputs to the SP.", 
+            "accessMode": "Read"
+        }, 
+        "synPermInactiveDec": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "How much an inactive synapse is decremented, specified as a percent of a fully grown synapse.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "inferenceMode": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "1 if the node is inferring (default 0).", 
+            "accessMode": "ReadWrite"
+        }, 
+        "synPermActiveInc": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "How much to increase the permanence of an active synapse, specified as a percent of a fully grown synapse.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "seed": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "Seed for our own pseudo-random number generator.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "synPermActiveSharedDec": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "How much to decrease the permanence of an active synapse which is connected to another column that is active at the same time. Specified as a percent of a fully grown synapse.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "gaussianDist": {
+            "count": 1, 
+            "dataType": "UInt32", 
+            "constraints": "bool", 
+            "description": "If true, the initial permanences assigned to each column will have a gaussian distribution to them, making the column favor inputs directly below it over inputs farther away. If false, the initial permanences will have a random distribution across the column's entire potential receptive field.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "maxFiringBoost": {
+            "count": 1, 
+            "dataType": "Real32", 
+            "constraints": "", 
+            "description": "The maximum firing level boost factor. Each column's raw firing strength gets multiplied by a boost factor before it gets considered for inhibition. The actual boost factor for a column is number between 1.0 and maxFiringBoost. A boost factor of 1.0 is used if the duty cycle is >= minDutyCycle, maxFiringBoost is used if the duty cycle is 0, and any duty cycle in between is linearly extrapolated from these 2 endpoints.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "cloneMap": {
+            "count": 0, 
+            "dataType": "Byte", 
+            "constraints": "multiple", 
+            "description": "An array (numColumnsHigh, numColumnsWide) that contains the clone index to use for each column.", 
+            "accessMode": "ReadWrite"
+        }, 
+        "spOutputNonZeros": {
+            "count": 0, 
+            "dataType": "UInt32", 
+            "constraints": "", 
+            "description": "The indices of the non-zero outputs from the spatial pooler", 
+            "accessMode": "Read"
+        }
+    }, 
+    "inputs": {
+        "bottomUpIn": {
+            "count": 0, 
+            "requireSplitterMap": false, 
+            "description": "The input vector.", 
+            "isDefaultInput": true, 
+            "dataType": "Real32", 
+            "required": true, 
+            "regionLevel": false
+        }, 
+        "resetIn": {
+            "count": 1, 
+            "requireSplitterMap": false, 
+            "description": "A boolean flag that indicates whether\n                         or not the input vector received in this compute cycle\n                         represents the start of a new temporal sequence.", 
+            "isDefaultInput": false, 
+            "dataType": "Real32", 
+            "required": false, 
+            "regionLevel": true
+        }, 
+        "topDownIn": {
+            "count": 0, 
+            "requireSplitterMap": false, 
+            "description": "The top-down input signal, generated from\n                        feedback from upper levels", 
+            "isDefaultInput": false, 
+            "dataType": "Real32", 
+            "required": false, 
+            "regionLevel": true
+        }
+    }
+}
