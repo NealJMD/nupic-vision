@@ -41,17 +41,24 @@ class ImageClassifier():
 				self.net.link(str(link["src"]), str(link["dest"]), str(linkType), json.dumps(params), str(terminal["srcOutput"]), str(terminal["destInput"]))
 
 		self.net.initialize()
-		self.net.inspect()
 		return self.net
 
-	def _loadImages(self, directory, kwargs):
+	def _loadImages(self, directory, additionalArgs=[]):
+		""" load all images in directory and its subdirs into the ImageSensor
+			and return the number of network steps it will take to explore
+			all images. """
+		requiredIterations = 0
 		for name in self.net.regions:
 			if self.net.regions[name].type != "py.ImageSensor": continue
-			self.net.regions[name].loadMultipleImages(directory, **kwargs)
+			args = ["loadMultipleImages", directory]+additionalArgs
+			self.net.regions[name].executeCommand(args)
+			nn = self.net.regions[name].getParameter("numIterations")
+			if nn > requiredIterations: requiredIterations = nn
+		return requiredIterations
 
-	def train(self, trainingDir, imageLoadingArgs={}):
-		self._loadImages(trainingDir, imageLoadingArgs)
-		self.net
+	def train(self, trainingDir, imageLoadingArgs=[]):
+		requiredIterations = self._loadImages(trainingDir, imageLoadingArgs)
+		self.net.run(requiredIterations)
 
 	def test(self, testingDir):
 		pass
@@ -63,6 +70,7 @@ class ImageClassifier():
 
 def main():
 	classifier = ImageClassifier("architecture.json")
+	classifier.train("../nupic-vision-data/faces-v-motorbikes")
 
 if __name__ == '__main__':
 	main()

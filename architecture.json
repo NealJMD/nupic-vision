@@ -4,24 +4,38 @@
 			"name": "input",
 			"type": "py.ImageSensor",
 			"params": {
-				"height": 200,
-				"width": 200
+				"height": 10,
+				"width": 10
 			}
 		},
 		{
 			"name": "sp1",
 			"type": "py.SPRegion",
 			"params": {
-				"columnCount": 72,
-				"inputWidth": 200
+				"columnCount": 100,
+				"inputWidth": 100
 			}
 		},
 		{
 			"name": "sp2",
 			"type": "py.SPRegion",
 			"params": {
-				"columnCount": 72,
-				"inputWidth": 200
+				"columnCount": 400,
+				"inputWidth": 400
+			}
+		},
+		{
+			"name": "svm",
+			"type": "py.SVMClassifierRegion",
+			"params": {
+
+			}
+		},
+		{
+			"name": "recorder",
+			"type": "py.RecorderRegion",
+			"params": {
+				"path": "output.txt"
 			}
 		}
 	],
@@ -36,7 +50,9 @@
 					"destInput": ""
 				}
 			],
-			"params": {}
+			"params": {
+				"rfSize": [10, 10]
+			}
 		},
 		{
 			"src": "sp1",
@@ -46,6 +62,58 @@
 				{
 					"srcOutput": "",
 					"destInput": ""
+				}
+			],
+			"params": {
+				"rfSize": [20, 20]
+			}
+		},
+		{
+			"src": "sp2",
+			"dest": "svm",
+			"type": "UniformLink",
+			"terminals": [
+				{
+					"srcOutput": "",
+					"destInput": ""
+				}
+			],
+			"params": {
+				"rfSize": [20, 20]
+			}
+		},
+		{
+			"src": "input",
+			"dest": "svm",
+			"type": "UniformLink",
+			"terminals": [
+				{
+					"srcOutput": "categoryOut",
+					"destInput": "categoryIn"
+				}
+			],
+			"params": {}
+		},
+		{
+			"src": "input",
+			"dest": "recorder",
+			"type": "UniformLink",
+			"terminals": [
+				{
+					"srcOutput": "categoryOut",
+					"destInput": "categoryTruth"
+				}
+			],
+			"params": {}
+		},
+		{
+			"src": "svm",
+			"dest": "recorder",
+			"type": "UniformLink",
+			"terminals": [
+				{
+					"srcOutput": "categoriesOut",
+					"destInput": "categoryGuess"
 				}
 			],
 			"params": {}
